@@ -1,11 +1,10 @@
 ﻿using CurrencyConverter.Library;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace CurrencyConverter.Controllers
@@ -13,21 +12,21 @@ namespace CurrencyConverter.Controllers
     [ApiController]
     public class CurrencyConverterController : ControllerBase
     {
+        private readonly HttpClient client;
 
-        private readonly ILogger<CurrencyConverterController> _logger;
-
-        public CurrencyConverterController(ILogger<CurrencyConverterController> logger)
+        public CurrencyConverterController(IHttpClientFactory clientFactory)
         {
-            _logger = logger;
+            this.client = clientFactory.CreateClient("data");
         }
+
 
         [HttpGet]
         [Route("/api/products/{product}/price")]
         public async Task<ProductPrice> Get([FromRoute]string product, [FromQuery]string targetCurrency)
         {
-            WebClient wc = new WebClient();
-            string exchangeRatesPath = "https://cddataexchange.blob.core.windows.net/data-exchange/htl-homework/ExchangeRates.csv";
-            IEnumerable<ExchangeRate> exchangeRates = (await wc.DownloadStringTaskAsync(exchangeRatesPath)).
+            string exchangeRatesPath = "ExchangeRates.csv";
+            IEnumerable<ExchangeRate> exchangeRates = (await (await client.GetAsync(exchangeRatesPath))
+                .EnsureSuccessStatusCode().Content.ReadAsStringAsync()).
                 Replace("\r", string.Empty).Split("\n").Select((s, id) =>
                 {
                     Console.WriteLine(id);
@@ -44,8 +43,9 @@ namespace CurrencyConverter.Controllers
                     }
                     return null;
                 }).Where(e => e != null);
-            string pricesPath = "https://cddataexchange.blob.core.windows.net/data-exchange/htl-homework/Prices.csv";
-            IEnumerable<Product> products = (await wc.DownloadStringTaskAsync(pricesPath)).
+            string pricesPath = "Prices.csv";
+            IEnumerable<Product> products = (await (await client.GetAsync(pricesPath))
+                .EnsureSuccessStatusCode().Content.ReadAsStringAsync()).
                 Replace("\r", string.Empty).Split("\n").Select((s, id) =>
                 {
                     Console.WriteLine(id);
